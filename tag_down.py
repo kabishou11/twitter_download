@@ -90,6 +90,9 @@ def get_heighest_video_quality(variants) -> str:   #找到最高质量的视频�
 
 def download_control(media_lst, _csv):
     async def _main():
+        semaphore = asyncio.Semaphore(max_concurrent_requests)
+
+        # 下载并保存文件的异步函数
         async def down_save(url, _csv_info, is_image):
             if is_image:
                 url += '?format=png&name=4096x4096'
@@ -99,19 +102,26 @@ def download_control(media_lst, _csv):
                 try:
                     async with semaphore:
                         async with httpx.AsyncClient() as client:
-                            response = await client.get(quote_url(url), timeout=(3.05, 16))        #如果出现第五次或以上的下载失败,且确认不是网络问题,可以适当降低最大并发数量
-                    with open(_csv_info[6],'wb') as f:  #_csv_info[6] : Saved Path
+                            response = await client.get(quote_url(url), timeout=(3.05, 16))
+                    with open(_csv_info[6], 'wb') as f:  # _csv_info[6] : Saved Path
                         f.write(response.content)
                     break
                 except Exception as e:
                     count += 1
                     print(e)
                     print(f'{_csv_info[6]}=====>第{count}次下载失败,正在重试')
+
+            # 将下载的信息输入到 CSV 中
             _csv.data_input(_csv_info)
 
-        semaphore = asyncio.Semaphore(max_concurrent_requests)
-        await asyncio.gather(*[asyncio.create_task(down_save(url[0], url[1], url[2])) for url in media_lst])   # 0:url 1:csv_info 2:is_image
+        # 创建所有下载任务
+        tasks = [down_save(url, info, is_image) for url, info, is_image in media_lst]
 
+        # 使用 tqdm 异步进度条
+        for coro in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="下载进度"):
+            await coro  # 等待每个任务完成
+
+    # 启动异步任务
     asyncio.run(_main())
 
 class csv_gen():
