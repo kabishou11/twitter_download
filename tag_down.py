@@ -10,7 +10,7 @@ import hashlib
 from datetime import datetime
 from urllib.parse import quote
 from url_utils import quote_url
-
+from tqdm.asyncio import tqdm 
 
 ##########配置区域##########
 
